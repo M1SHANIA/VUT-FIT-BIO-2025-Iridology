@@ -1,5 +1,5 @@
 import { detect } from './iris.js';
-import { drawIridologyMap, createInteractiveMap, drawRadialZoneLegend, unwrapIris, drawUnwrappedIridologyMap } from './iridologyMap.js';
+import { drawIridologyMap, createInteractiveMap, drawRadialZoneLegend, unwrapIris, drawUnwrappedIridologyMap, drawIridologyMapWithHealth, drawAdaptedIridologyMap, drawAdaptedSVGIridologyMap } from './iridologyMap.js';
 
 // Make onOpenCvReady global so it can be called from the OpenCV script onload
 window.onOpenCvReady = function () {
@@ -263,15 +263,29 @@ async function runDetectOnCanvas(canvas, msgEl, drawInfo, eye = 'left') {
 
     // Draw iridology map on unwrapped image
     const ctx = eyeDOM.unwrapCanvas.getContext('2d');
-    await drawUnwrappedIridologyMap(ctx, eyeDOM.unwrapCanvas.width, eye, {
-      showRadialZones: true,
-      showSectors: true,
-      showLabels: true,
-      showGrid: true,
-      showClockNumbers: true,
-      opacity: 1.0
-    });
 
+    // Use adapted SVG map with professional format - loads the sector map and adapts it
+    try {
+      await drawAdaptedSVGIridologyMap(
+        ctx,
+        eyeDOM.unwrapCanvas.width,
+        result.iris,
+        result.pupil,
+        result.middleCircle,
+        eye
+      );
+    } catch (err) {
+      console.warn('SVG map loading failed, using geometric map instead:', err);
+      // Fallback to geometric map
+      drawAdaptedIridologyMap(
+        ctx,
+        eyeDOM.unwrapCanvas.width,
+        result.iris,
+        result.pupil,
+        result.middleCircle,
+        eye
+      );
+    }
     unwrapped.delete();
 
     // Show the unwrap container
