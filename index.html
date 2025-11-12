@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Iridology — Iris & Pupil Detector (Vanilla JS + OpenCV)</title>
+    <title>Iridology — Advanced Iris Analysis</title>
     <link rel="stylesheet" href="/src/style.css" />
     <!-- OpenCV.js from official docs (auto-updates). If you're offline, supply a local opencv.js build. -->
     <script
@@ -14,52 +14,98 @@
     <script type="module" src="/src/main.js"></script>
   </head>
   <body>
-    <h1>Iridology — Iris & Pupil Detector (Vanilla JS + OpenCV)</h1>
-    <p>
-      <small
-        >Upload or capture two photos (Left and Right eye). The app detects the
-        pupil (Daugman-like + contour) and the iris (edge/Hough and Daugman
-        fallback). Circles are overlaid on each image.</small
-      >
-    </p>
-
-    <div class="row">
-      <div class="card" id="leftCard">
-        <label>Left eye</label>
-        <div class="controls">
-          <input id="leftFile" type="file" accept="image/*" />
-          <button id="leftCamBtn">Use camera</button>
-          <button id="leftClearBtn">Clear</button>
-        </div>
-        <canvas id="leftCanvas" width="640" height="480"></canvas>
-        <div id="leftMsg" class="err" aria-live="polite"></div>
-        <div id="leftUnwrapContainer" style="display: none; margin-top: 20px">
-          <h3 style="margin: 10px 0">Unwrapped Iris with Iridology Map</h3>
-          <canvas id="leftUnwrapCanvas" width="2000" height="2000"></canvas>
+    <header class="header">
+      <div class="header-content">
+        <div class="header-title">
+          <h1>Iridology Analyzer</h1>
+          <p class="subtitle">
+            Advanced Iris & Pupil Detection with Sector Mapping
+          </p>
+          <h2>How it works</h2>
+          <p>
+            Upload or capture two photos (Left and Right eye). The app detects
+            the pupil (Daugman-like + contour) and the iris (edge/Hough and
+            Daugman fallback). Circles are overlaid on each image.
+          </p>
         </div>
       </div>
+    </header>
 
-      <div class="card" id="rightCard">
-        <label>Right eye</label>
-        <div class="controls">
-          <input id="rightFile" type="file" accept="image/*" />
-          <button id="rightCamBtn">Use camera</button>
-          <button id="rightClearBtn">Clear</button>
-        </div>
-        <canvas id="rightCanvas" width="640" height="480"></canvas>
-        <div id="rightMsg" class="err" aria-live="polite"></div>
-        <div id="rightUnwrapContainer" style="display: none; margin-top: 20px">
-          <h3 style="margin: 10px 0">Unwrapped Iris with Iridology Map</h3>
-          <canvas id="rightUnwrapCanvas" width="2000" height="2000"></canvas>
-        </div>
-      </div>
-    </div>
+    <main class="main-content">
+      <section class="analysis-section">
+        <h2 class="section-title">Analysis</h2>
+        <div class="eyes-container">
+          <div class="eye-card" id="leftCard">
+            <div class="eye-header">
+              <h3>👁️ Left Eye</h3>
+              <span class="eye-label">Left</span>
+            </div>
+            <div class="controls">
+              <input id="leftFile" type="file" accept="image/*" />
+              <button id="leftCamBtn" class="btn btn-primary">📷 Camera</button>
+              <button id="leftClearBtn" class="btn btn-secondary">
+                🗑️ Clear
+              </button>
+            </div>
+            <canvas
+              id="leftCanvas"
+              width="640"
+              height="480"
+              class="eye-canvas"
+            ></canvas>
+            <div id="leftMsg" class="message" aria-live="polite"></div>
+            <div
+              id="leftUnwrapContainer"
+              class="unwrap-container"
+              style="display: none"
+            >
+              <h4>📊 Unwrapped Iris Map</h4>
+              <canvas
+                id="leftUnwrapCanvas"
+                width="2000"
+                height="2000"
+                class="unwrap-canvas"
+              ></canvas>
+            </div>
+          </div>
 
-    <p style="margin-top: 12px">
-      <small
-        >Important: This is an image-processing prototype. For clinical use,
-        validate on your own datasets and consult a specialist.</small
-      >
-    </p>
+          <div class="eye-card" id="rightCard">
+            <div class="eye-header">
+              <h3>👁️ Right Eye</h3>
+              <span class="eye-label">Right</span>
+            </div>
+            <div class="controls">
+              <input id="rightFile" type="file" accept="image/*" />
+              <button id="rightCamBtn" class="btn btn-primary">
+                📷 Camera
+              </button>
+              <button id="rightClearBtn" class="btn btn-secondary">
+                🗑️ Clear
+              </button>
+            </div>
+            <canvas
+              id="rightCanvas"
+              width="640"
+              height="480"
+              class="eye-canvas"
+            ></canvas>
+            <div id="rightMsg" class="message" aria-live="polite"></div>
+            <div
+              id="rightUnwrapContainer"
+              class="unwrap-container"
+              style="display: none"
+            >
+              <h4>📊 Unwrapped Iris Map</h4>
+              <canvas
+                id="rightUnwrapCanvas"
+                width="2000"
+                height="2000"
+                class="unwrap-canvas"
+              ></canvas>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   </body>
 </html>

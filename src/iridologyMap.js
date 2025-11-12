@@ -143,6 +143,222 @@ function loadSVGImage(path) {
 }
 
 /**
+ * Draw iridology map in professional format with visible grid
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} size - Canvas size (square)
+ * @param {object} iris - Iris circle {x, y, r}
+ * @param {object} pupil - Pupil circle {x, y, r}
+ * @param {object} middleCircle - Middle circle {x, y, r}
+ * @param {string} eye - 'left' or 'right'
+ */
+export function drawAdaptedIridologyMap(ctx, size, iris, pupil, middleCircle, eye = 'right') {
+    ctx.save();
+
+    const irisRadiusCanvas = size / 2.8;
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    const scaleFactor = irisRadiusCanvas / iris.r;
+    const pupilRadiusCanvas = pupil.r * scaleFactor;
+    const middleCircleRadiusCanvas = middleCircle.r * scaleFactor;
+    const irisRadiusOuter = irisRadiusCanvas;
+
+    // ===== RADIAL ZONES (концентрические кольца) =====
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 0.3;
+
+    // Множество колец от зрачка до радужки
+    const numRings = 25;
+    for (let i = 1; i < numRings; i++) {
+        const r = pupilRadiusCanvas + (irisRadiusOuter - pupilRadiusCanvas) * (i / numRings);
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+        ctx.stroke();
+    }
+
+    // ===== SECTORAL DIVISIONS (based on EYE_SECTORS organ map) =====
+    // Draw main sector boundaries with stronger lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+    ctx.lineWidth = 0.6;
+
+    const sectors = EYE_SECTORS[eye] || EYE_SECTORS['right'];
+
+    // Draw radial lines for sector boundaries
+    sectors.forEach((sector) => {
+        // Draw line at startAngle
+        let angleRad = (sector.startAngle / 60) * Math.PI * 2 - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(
+            centerX + irisRadiusOuter * Math.cos(angleRad),
+            centerY + irisRadiusOuter * Math.sin(angleRad)
+        );
+        ctx.stroke();
+    });
+
+    // ===== FINE SUBDIVISION LINES (дополнительные деления) =====
+    // Draw finer subdivision lines at 1-degree increments
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.lineWidth = 0.2;
+
+    for (let i = 0; i < 60; i++) {
+        // Skip main sector boundaries (already drawn)
+        const isSectorBoundary = sectors.some(s => s.startAngle === i || s.endAngle === i);
+        if (isSectorBoundary) continue;
+
+        const angleRad = (i / 60) * Math.PI * 2 - Math.PI / 2;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(
+            centerX + irisRadiusOuter * Math.cos(angleRad),
+            centerY + irisRadiusOuter * Math.sin(angleRad)
+        );
+        ctx.stroke();
+    }
+
+    // ===== IMPORTANT BOUNDARIES =====
+
+    // Pupil boundary (жёлтая/оранжевая линия)
+    ctx.strokeStyle = 'rgba(255, 200, 0, 1)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, pupilRadiusCanvas, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Middle circle boundary (зелёная линия)
+    ctx.strokeStyle = 'rgba(0, 255, 100, 1)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, middleCircleRadiusCanvas, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Outer iris boundary (синяя линия)
+    ctx.strokeStyle = 'rgba(0, 150, 255, 1)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, irisRadiusOuter, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // ===== CROSSHAIR (крестик в центре) =====
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    ctx.lineWidth = 0.5;
+
+    const crossSize = irisRadiusOuter * 0.15;
+    // Vertical line
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - crossSize);
+    ctx.lineTo(centerX, centerY + crossSize);
+    ctx.stroke();
+
+    // Horizontal line
+    ctx.beginPath();
+    ctx.moveTo(centerX - crossSize, centerY);
+    ctx.lineTo(centerX + crossSize, centerY);
+    ctx.stroke();
+
+    // ===== CLOCK MARKS (метки часов) =====
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.lineWidth = 0.5;
+
+    const markLength = irisRadiusOuter * 0.08;
+    for (let i = 0; i < 60; i++) {
+        const angleRad = (i / 60) * Math.PI * 2 - Math.PI / 2;
+        const isMainMark = i % 5 === 0;
+        const len = isMainMark ? markLength * 1.5 : markLength;
+
+        const x1 = centerX + (irisRadiusOuter - len) * Math.cos(angleRad);
+        const y1 = centerY + (irisRadiusOuter - len) * Math.sin(angleRad);
+        const x2 = centerX + irisRadiusOuter * Math.cos(angleRad);
+        const y2 = centerY + irisRadiusOuter * Math.sin(angleRad);
+
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Draw adapted iridology map using SVG with proper scaling to eye boundaries
+ * Adapts the professional SVG sector map to fit the detected pupil/middleCircle/iris boundaries
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {number} size - Canvas size (square)
+ * @param {object} iris - Iris circle {x, y, r}
+ * @param {object} pupil - Pupil circle {x, y, r}
+ * @param {object} middleCircle - Middle circle {x, y, r}
+ * @param {string} eye - 'left' or 'right'
+ */
+export async function drawAdaptedSVGIridologyMap(ctx, size, iris, pupil, middleCircle, eye = 'right') {
+    ctx.save();
+
+    const irisRadiusCanvas = size / 2.8;
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    const scaleFactor = irisRadiusCanvas / iris.r;
+    const pupilRadiusCanvas = pupil.r * scaleFactor;
+    const middleCircleRadiusCanvas = middleCircle.r * scaleFactor;
+    const irisRadiusOuter = irisRadiusCanvas;
+
+    try {
+        // Load the SVG map
+        const svgFile = eye === 'left' ? '/left.svg' : '/right.svg';
+        const svgImg = await loadSVGImage(svgFile);
+
+        // The SVG is designed for a circular iris/eye map
+        // We need to scale it to fit between pupil and iris boundaries
+
+        // SVG viewBox dimensions
+        const svgSize = Math.max(svgImg.width, svgImg.height);
+
+        // The SVG is designed to fit the entire iris, but we want to scale it
+        // to properly fit between our detected boundaries
+        // Scale factor: map the SVG to the space from pupil to iris
+        const mapDiameter = irisRadiusOuter * 2;
+        const scale = mapDiameter / svgSize;
+
+        // Apply scaling transformation
+        ctx.translate(centerX, centerY);
+        ctx.scale(scale, scale);
+        ctx.translate(-svgSize / 2, -svgSize / 2);
+
+        // Draw the SVG
+        ctx.drawImage(svgImg, 0, 0, svgSize, svgSize);
+
+        ctx.restore();
+        ctx.save();
+
+        // Now draw the colored boundaries on top
+        ctx.strokeStyle = 'rgba(255, 200, 0, 1)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, pupilRadiusCanvas, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(0, 255, 100, 1)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, middleCircleRadiusCanvas, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(0, 150, 255, 1)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, irisRadiusOuter, 0, Math.PI * 2);
+        ctx.stroke();
+
+    } catch (error) {
+        console.error('Error loading SVG map:', error);
+        // Fallback to geometric map if SVG loading fails
+        drawAdaptedIridologyMap(ctx, size, iris, pupil, middleCircle, eye);
+    }
+
+    ctx.restore();
+}
+
+/**
  * Draw detailed iridology map on extracted iris image
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {number} size - Canvas size (square)
@@ -274,7 +490,7 @@ export function drawIridologyMap(ctx, iris, pupil, eye = 'right', options = {}) 
     // Draw radial zones (concentric circles)
     if (showRadialZones && showGrid) {
         ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 0.5;
 
         RADIAL_ZONES.forEach(zone => {
             const outerR = pupilRadius + zone.outerRatio * effectiveRadius;
@@ -288,7 +504,7 @@ export function drawIridologyMap(ctx, iris, pupil, eye = 'right', options = {}) 
     if (showSectors && showGrid) {
         const sectors = EYE_SECTORS[eye];
         ctx.strokeStyle = 'rgba(0, 0, 0, 1)';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 0.5;
 
         sectors.forEach(sector => {
             const startAngleRad = (sector.startAngle / 60) * Math.PI * 2 - Math.PI / 2;
@@ -398,6 +614,118 @@ export function drawRadialZoneLegend(ctx, x, y) {
         ctx.fillText(zone.name, x, y + offsetY);
         offsetY += 20;
     });
+
+    ctx.restore();
+}
+
+/**
+ * Draw iridology map with health analysis coloring
+ * @param {CanvasRenderingContext2D} ctx - Canvas context
+ * @param {object} iris - Iris circle {x, y, r}
+ * @param {object} pupil - Pupil circle {x, y, r}
+ * @param {string} eye - 'left' or 'right'
+ * @param {object} healthAnalysis - Analysis data with sector health status
+ *   Example: {
+ *     sectors: {
+ *       'Stomach': 'green',  // 'green' (healthy), 'yellow' (warning), 'red' (problem)
+ *       'Liver': 'red',
+ *       ...
+ *     }
+ *   }
+ * @param {object} options - Display options
+ */
+export function drawIridologyMapWithHealth(ctx, iris, pupil, eye = 'right', healthAnalysis = {}, options = {}) {
+    const {
+        showRadialZones = true,
+        showSectors = true,
+        showLabels = true,
+        showGrid = true,
+        showClockNumbers = true,
+        opacity = 1.0,
+        sectorColors = {} // Override colors per sector
+    } = options;
+
+    const centerX = iris.x;
+    const centerY = iris.y;
+    const irisRadius = iris.r;
+    const pupilRadius = pupil.r;
+    const effectiveRadius = irisRadius - pupilRadius;
+
+    ctx.save();
+
+    // Color mapping for health status
+    const healthColorMap = {
+        'green': 'rgba(34, 197, 94, 0.3)',   // healthy - light green
+        'yellow': 'rgba(234, 179, 8, 0.3)',  // warning - light yellow
+        'red': 'rgba(239, 68, 68, 0.3)',     // problem - light red
+        'gray': 'rgba(107, 114, 128, 0.2)'   // unknown - light gray
+    };
+
+    const sectors = EYE_SECTORS[eye];
+
+    // Draw sectors with health coloring
+    if (showSectors && showGrid) {
+        sectors.forEach((sector, idx) => {
+            const startAngleRad = (sector.startAngle / 60) * Math.PI * 2 - Math.PI / 2;
+            const endAngleRad = (sector.endAngle / 60) * Math.PI * 2 - Math.PI / 2;
+
+            // Determine sector color based on health analysis
+            let fillColor = healthColorMap.gray;
+            if (sectorColors[sector.name]) {
+                fillColor = sectorColors[sector.name];
+            } else if (healthAnalysis.sectors && healthAnalysis.sectors[sector.name]) {
+                const health = healthAnalysis.sectors[sector.name];
+                fillColor = healthColorMap[health] || healthColorMap.gray;
+            }
+
+            // Draw colored sector
+            ctx.fillStyle = fillColor;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, irisRadius, startAngleRad, endAngleRad);
+            ctx.lineTo(centerX, centerY);
+            ctx.fill();
+
+            // Draw sector border
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.lineWidth = 0.5;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(
+                centerX + irisRadius * Math.cos(startAngleRad),
+                centerY + irisRadius * Math.sin(startAngleRad)
+            );
+            ctx.stroke();
+        });
+    }
+
+    // Draw radial zones (concentric circles) with thinner lines
+    if (showRadialZones && showGrid) {
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.lineWidth = 0.5;
+
+        RADIAL_ZONES.forEach(zone => {
+            const outerR = pupilRadius + zone.outerRatio * effectiveRadius;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, outerR, 0, Math.PI * 2);
+            ctx.stroke();
+        });
+    }
+
+    // Draw outer iris boundary
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, irisRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (showClockNumbers) {
+        drawClockNumbers(ctx, iris, pupil, opacity);
+    }
+
+    if (showLabels) {
+        drawZoneLabels(ctx, iris, pupil, eye, opacity);
+    }
 
     ctx.restore();
 }
