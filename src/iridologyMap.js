@@ -3,6 +3,9 @@
  * Creates an iridological chart overlay on detected iris
  */
 
+import { warpSVGCanvas } from './svg_mapper.js';
+
+
 // Radial zones for reference (used in drawIridologyMap)
 const RADIAL_ZONES = [
     { name: 'Stomach', innerRatio: 0, outerRatio: 0.35 },
@@ -125,7 +128,7 @@ const svgCache = {};
  * @param {string} path - Path to SVG file
  * @returns {Promise} - Promise that resolves with the image
  */
-function loadSVGImage(path) {
+function loadSVGImage(path, dstInner, dstMiddle) {
     return new Promise((resolve, reject) => {
         if (svgCache[path]) {
             resolve(svgCache[path]);
@@ -134,8 +137,25 @@ function loadSVGImage(path) {
 
         const img = new Image();
         img.onload = () => {
-            svgCache[path] = img;
-            resolve(img);
+            // 1. Draw the SVG onto a temp canvas
+            const w = img.width;
+            const h = img.height;
+            const temp = document.createElement("canvas");
+            temp.width = w;
+            temp.height = h;
+            const tctx = temp.getContext("2d");
+            tctx.drawImage(img, 0, 0);
+
+            // 2. Warp it
+            const warped = warpSVGCanvas(
+                temp, 
+                // percentage radii in detected iris
+                // calculated by r / maxRadius
+                dstInner, dstMiddle
+            );
+
+            svgCache[path] = warped;
+            resolve(warped);
         };
         img.onerror = () => reject(new Error(`Failed to load ${path}`));
         img.src = path;
@@ -302,10 +322,17 @@ export async function drawAdaptedSVGIridologyMap(ctx, size, iris, pupil, middleC
     const middleCircleRadiusCanvas = middleCircle.r * scaleFactor;
     const irisRadiusOuter = irisRadiusCanvas;
 
+    const maxRadius = iris.r;
+
     try {
         // Load the SVG map
         const svgFile = eye === 'left' ? '/left.svg' : '/right.svg';
-        const svgImg = await loadSVGImage(svgFile);
+        const svgImg = await loadSVGImage(
+            svgFile,
+            pupil.r / maxRadius,
+            middleCircle.r / maxRadius
+        );
+
 
         // The SVG is designed for a circular iris/eye map
         // We need to scale it to fit between pupil and iris boundaries

@@ -3,7 +3,7 @@ function detect_middle_circle(srcMat, iris, pupil) {
   // TODO
 
   // Estimate middle circle as weighted average between pupil and iris
-  const r = Math.round(pupil.r + 0.3 * (iris.r - pupil.r));
+  const r = Math.round(pupil.r + 0.35 * (iris.r - pupil.r));
   return {
     x: iris.x,
     y: iris.y,
