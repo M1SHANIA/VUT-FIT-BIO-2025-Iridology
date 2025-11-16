@@ -1,5 +1,6 @@
 import { detect } from './iris.js';
 import { drawIridologyMap, createInteractiveMap, drawRadialZoneLegend, unwrapIris, drawUnwrappedIridologyMap, drawIridologyMapWithHealth, drawAdaptedIridologyMap, drawAdaptedSVGIridologyMap } from './iridologyMap.js';
+import { EYE_SECTORS } from './iridologyMap.js';
 
 // Make onOpenCvReady global so it can be called from the OpenCV script onload
 window.onOpenCvReady = function () {
@@ -291,6 +292,9 @@ async function runDetectOnCanvas(canvas, msgEl, drawInfo, eye = 'left') {
     // Show the unwrap container
     eyeDOM.unwrapContainer.style.display = 'block';
 
+    // Add interactive hover functionality
+    setupCanvasHover(eyeDOM.unwrapCanvas, result.iris, result.pupil, eye);
+
     msgEl.className = 'ok';
     msgEl.textContent = 'Detected: pupil and iris.';
   } catch (err) {
@@ -298,6 +302,92 @@ async function runDetectOnCanvas(canvas, msgEl, drawInfo, eye = 'left') {
     msgEl.className = 'err';
     msgEl.textContent = 'Error during detection: ' + err.message;
   }
+}
+
+// Setup hover functionality for unwrapped canvas
+function setupCanvasHover(canvas, iris, pupil, eye) {
+  // Create tooltip element if it doesn't exist
+  let tooltip = document.getElementById('iris-tooltip');
+  if (!tooltip) {
+    tooltip = document.createElement('div');
+    tooltip.id = 'iris-tooltip';
+    tooltip.style.cssText = `
+      position: fixed;
+      background: rgba(15, 23, 42, 0.95);
+      color: #e2e8f0;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      pointer-events: none;
+      z-index: 10000;
+      display: none;
+      border: 1px solid rgba(59, 130, 246, 0.5);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `;
+    document.body.appendChild(tooltip);
+  }
+
+  // Remove old listeners
+  const oldHandler = canvas._hoverHandler;
+  if (oldHandler) {
+    canvas.removeEventListener('mousemove', oldHandler);
+    canvas.removeEventListener('mouseleave', oldHandler.leave);
+  }
+
+  const size = canvas.width;
+  const center = size / 2;
+  const irisRadius = size / 2.8;
+
+  const sectors = EYE_SECTORS[eye] || EYE_SECTORS['right'];
+
+  const handleMouseMove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // Convert canvas coordinates to centered coordinates
+    const dx = x * (canvas.width / rect.width) - center;
+    const dy = y * (canvas.height / rect.height) - center;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // Check if mouse is within iris
+    if (distance <= irisRadius && distance > 0) {
+      // Calculate angle (0-60 scale)
+      let angle = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+      if (angle < 0) angle += 360;
+      let clockPosition = (angle / 360) * 60;
+
+      // Find which sector
+      const sector = sectors.find(s =>
+        clockPosition >= s.startAngle && clockPosition < s.endAngle
+      );
+
+      if (sector) {
+        tooltip.textContent = sector.name;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX + 15) + 'px';
+        tooltip.style.top = (e.clientY + 15) + 'px';
+        canvas.style.cursor = 'pointer';
+        return;
+      }
+    }
+
+    tooltip.style.display = 'none';
+    canvas.style.cursor = 'default';
+  };
+
+  const handleMouseLeave = () => {
+    tooltip.style.display = 'none';
+    canvas.style.cursor = 'default';
+  };
+
+  canvas.addEventListener('mousemove', handleMouseMove);
+  canvas.addEventListener('mouseleave', handleMouseLeave);
+
+  // Store handlers for cleanup
+  canvas._hoverHandler = handleMouseMove;
+  canvas._hoverHandler.leave = handleMouseLeave;
 }
 
 // overlay circles on canvas
