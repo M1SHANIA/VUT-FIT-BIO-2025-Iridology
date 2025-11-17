@@ -11,7 +11,7 @@ const RADIAL_ZONES = [
 ];
 
 // Sector definitions for both eyes
-const EYE_SECTORS = {
+export const EYE_SECTORS = {
     left: [
         { name: 'Throat', startAngle: 0, endAngle: 3 },
         { name: 'Bronchi', startAngle: 3, endAngle: 7 },
