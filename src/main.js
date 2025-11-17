@@ -39,6 +39,145 @@ const getEyeDOM = (eye) => ({
   unwrapContainer: DOM[`${eye}UnwrapContainer`]
 });
 
+// Modal functions
+function showResultModal(eye) {
+  const resultModal = document.getElementById('resultModal');
+  const resultCanvas = document.getElementById('resultCanvas');
+  const modalTitle = document.getElementById('modalTitle');
+
+  if (!resultModal || !resultCanvas) return;
+
+  // Get the correct unwrap canvas based on which eye was processed
+  const sourceCanvas = eye === 'left' ? DOM.leftUnwrapCanvas : DOM.rightUnwrapCanvas;
+
+  if (sourceCanvas && sourceCanvas.offsetParent !== null) {
+    // Draw the source canvas content to result canvas (with map)
+    const ctx = resultCanvas.getContext('2d');
+    ctx.drawImage(sourceCanvas, 0, 0, resultCanvas.width, resultCanvas.height);
+
+    // Store the version with map
+    resultCanvas.dataset.eye = eye;
+    resultCanvas.dataset.canvasWithMap = resultCanvas.toDataURL('image/png');
+
+    // Create version without the map
+    // We need to redraw the unwrapped iris without the SVG overlay
+    const detectionResult = detectionState[eye].result;
+    const detectionImage = detectionState[eye].image;
+
+    if (detectionResult && detectionImage) {
+      // Create a temporary canvas for the unwrapped iris (without map)
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = resultCanvas.width;
+      tempCanvas.height = resultCanvas.height;
+
+      // Load the detection image and unwrap it
+      const src = cv.imread(DOM[`${eye}Canvas`]);
+      const unwrappedMat = unwrapIris(src, detectionResult.iris, detectionResult.pupil);
+      cv.imshow(tempCanvas, unwrappedMat);
+      src.delete();
+      unwrappedMat.delete();
+
+      // Save the version without map
+      resultCanvas.dataset.canvasWithoutMap = tempCanvas.toDataURL('image/png');
+    }
+
+    // Update title
+    if (modalTitle) {
+      modalTitle.textContent = `Analysis Result - ${eye === 'left' ? 'Left' : 'Right'} Eye`;
+    }
+  }
+
+  resultModal.style.display = 'flex';
+
+  // Setup hover for result canvas
+  setupSVGHover(resultCanvas, eye);
+} function closeResultModal() {
+  const resultModal = document.getElementById('resultModal');
+  if (resultModal) resultModal.style.display = 'none';
+}
+
+// Modal event listeners
+document.addEventListener('DOMContentLoaded', () => {
+  const closeModal = document.getElementById('closeModal');
+  const closeModalBtn = document.getElementById('closeModalBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const leftViewFullBtn = document.getElementById('leftViewFullBtn');
+  const rightViewFullBtn = document.getElementById('rightViewFullBtn');
+  const toggleMapVisibility = document.getElementById('toggleMapVisibility');
+  const resultCanvas = document.getElementById('resultCanvas');
+
+  if (closeModal) closeModal.addEventListener('click', closeResultModal);
+  if (closeModalBtn) closeModalBtn.addEventListener('click', closeResultModal);
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      const resultCanvas = document.getElementById('resultCanvas');
+      const eye = resultCanvas.dataset.eye || 'left';
+      if (resultCanvas) {
+        const link = document.createElement('a');
+        link.href = resultCanvas.toDataURL('image/png');
+        link.download = `iris-analysis-${eye}.png`;
+        link.click();
+      }
+    });
+  }
+
+  // Full screen view buttons
+  if (leftViewFullBtn) {
+    leftViewFullBtn.addEventListener('click', () => showResultModal('left'));
+  }
+  if (rightViewFullBtn) {
+    rightViewFullBtn.addEventListener('click', () => showResultModal('right'));
+  }
+
+  // Toggle map visibility
+  if (toggleMapVisibility) {
+    toggleMapVisibility.addEventListener('change', (e) => {
+      if (resultCanvas) {
+        const img = new Image();
+        if (e.target.checked) {
+          // Show with map
+          img.src = resultCanvas.dataset.canvasWithMap;
+        } else {
+          // Show without map
+          img.src = resultCanvas.dataset.canvasWithoutMap;
+        }
+        img.onload = () => {
+          const ctx = resultCanvas.getContext('2d');
+          ctx.clearRect(0, 0, resultCanvas.width, resultCanvas.height);
+          // Draw the image scaled to fill the canvas while maintaining aspect ratio
+          const imgAspect = img.width / img.height;
+          const canvasAspect = resultCanvas.width / resultCanvas.height;
+
+          let drawWidth = resultCanvas.width;
+          let drawHeight = resultCanvas.height;
+          let offsetX = 0;
+          let offsetY = 0;
+
+          if (imgAspect > canvasAspect) {
+            drawHeight = drawWidth / imgAspect;
+            offsetY = (resultCanvas.height - drawHeight) / 2;
+          } else {
+            drawWidth = drawHeight * imgAspect;
+            offsetX = (resultCanvas.width - drawWidth) / 2;
+          }
+
+          ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+        };
+      }
+    });
+  }
+
+  // Close modal when clicking outside
+  const resultModal = document.getElementById('resultModal');
+  if (resultModal) {
+    resultModal.addEventListener('click', (e) => {
+      if (e.target === resultModal) closeResultModal();
+    });
+  }
+});
+
+
 // Minimal app structure
 let cvReady = false;
 let activeStream = null;
@@ -253,9 +392,6 @@ async function runDetectOnCanvas(canvas, msgEl, drawInfo, eye = 'left') {
     // Store detection result
     detectionState[eye].result = result;
     detectionState[eye].drawInfo = drawInfo;
-
-    // Overlay circles on main canvas
-    overlayCircles(canvas, result.pupil, result.iris, result.middleCircle, eye);
 
     // Create and display unwrapped iris with map
     const unwrapped = unwrapIris(src, result.iris, result.pupil);
